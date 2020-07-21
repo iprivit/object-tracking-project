@@ -1,4 +1,4 @@
-FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:1.4.0-gpu-py36-cu101-ubuntu16.04
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:1.5.1-gpu-py36-cu101-ubuntu16.04
 ############# Installing latest builds ############
 
 # This is to fix issue: https://github.com/pytorch/vision/issues/1489
@@ -16,7 +16,15 @@ ENV FORCE_CUDA="1"
 ENV TORCH_CUDA_ARCH_LIST="Volta" 
 
 # Build D2 from latest sources
+
+
 RUN pip install 'git+https://github.com/facebookresearch/detectron2.git'
+# COPY detectron2 detectron2_repo
+# RUN pip install -e detectron2_repo
+WORKDIR /opt/ml/
+COPY model_final.pth /opt/ml/model/model_final.pth
+COPY model_final.pth /opt/ml/model_final.pth
+COPY detectron2/configs/quick_schedules/mask_rcnn_R_50_FPN_inference_acc_test.yaml opt/ml/mask_rcnn_R_50_FPN_inference_acc_test.yaml
 
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
