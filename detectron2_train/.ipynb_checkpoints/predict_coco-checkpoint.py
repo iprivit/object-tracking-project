@@ -7,6 +7,7 @@ import io
 import argparse
 import logging
 import sys
+import boto3
 import pickle    
 from yacs.config import CfgNode as CN
 import numpy as np
@@ -39,6 +40,7 @@ logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
+
 def _get_predictor(config_path, model_path):
     
     cfg = get_cfg()
@@ -50,8 +52,11 @@ def _get_predictor(config_path, model_path):
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
 
     pred = DefaultPredictor(cfg)
-    logger.info(cfg)
-    eval_results = pred.model.eval()
+    logger.info('Made it to loading predictor')
+    pred.model.load_state_dict(torch.load(model_path)['model'])
+    logger.info('Made it to loading weights')
+    #logger.info(cfg)
+    eval_results = pred.model.eval() 
 
     return pred
 
@@ -64,7 +69,10 @@ def model_fn(model_dir):
     """
     
     logger.info("Deserializing Detectron2 model...")
-    
+    os.system('ls /opt/ml/')
+    os.system('echo check model path')
+    os.system('ls /opt/ml/model')
+
     try:
         # Restoring trained model, take a first .yaml and .pth/.pkl file in the model directory
         for file in os.listdir(model_dir):
@@ -74,15 +82,24 @@ def model_fn(model_dir):
             # looks up for *.pkl or *.pth files with model weights
             if file.endswith(".pth") or file.endswith(".pkl"):
                 model_path = os.path.join(model_dir, file)
-
+                
+        config_path = '/opt/ml/mask_rcnn_R_50_FPN_inference_acc_test.yaml'
+        model_path = '/opt/ml/model_final_13000.pth'
         logger.info(f"Using config file {config_path}")
         logger.info(f"Using model weights from {model_path}")            
 
         pred = _get_predictor(config_path,model_path)
-        
-    except Exception as e:
-        logger.error("Model deserialization failed...")
-        logger.error(e)  
+    except:
+        try:
+            config_path = '/opt/ml/mask_rcnn_R_50_FPN_inference_acc_test.yaml'
+            model_path = '/opt/ml/model_final_5700.pth'
+            logger.info(f"Using config file {config_path}")
+            logger.info(f"Using backup model weights from {model_path}")            
+
+            pred = _get_predictor(config_path,model_path)
+        except Exception as e:
+            logger.error("Model deserialization failed...")
+            logger.error(e)  
         
     logger.info("Deserialization completed ...")
     
@@ -97,7 +114,10 @@ def input_fn(request_body, request_content_type):
     
     try:
         if "application/x-npy" in request_content_type:
-            input_object = decoder.decode(request_body, CONTENT_TYPE_NPY)
+            nparr = np.frombuffer(request_body, np.uint8)
+            #img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            input_object = np.asarray(img)
+#             input_object = decoder.decode(request_body, CONTENT_TYPE_NPY)
         elif "jpeg" in request_content_type:
             nparr = np.frombuffer(request_body, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)

@@ -3,4 +3,4 @@
 import subprocess
 
 if __name__ == '__main__':
-    subprocess.run(['python3','grab_and_save.py'])
+    subprocess.run(['python3','/home/run_tracker.py'])
