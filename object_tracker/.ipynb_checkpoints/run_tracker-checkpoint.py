@@ -242,8 +242,8 @@ def main():
 
     with open(file,'w') as f:
         json.dump(tracking_dict,f)
-    now = str(datetime.datetime.now()).replace(' ','').replace(':','-')
-    k = f'nfl-data/tracking_results_{now}.json'
+#     now = str(datetime.datetime.now()).replace(' ','').replace(':','-')
+    k = f'nfl-data/tracking_results_{folder}.json'
     s3.upload_file(Filename=file, Bucket=args.bucket, Key=k)
     print(f'Tracking finished and results saved to: s3://{args.bucket}/{k}')
     
