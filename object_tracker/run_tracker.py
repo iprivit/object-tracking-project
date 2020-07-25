@@ -27,6 +27,7 @@ from torchvision.ops.boxes import clip_boxes_to_image, nms
 
 from PIL import Image
 import itertools
+import logging
 from glob import glob
 from tqdm import tqdm
 import time, os, json
@@ -116,16 +117,17 @@ def main():
     if os.path.exists(args.img_paths)==False:
         objs = s3.list_objects(Bucket='privisaa-bucket-virginia', Prefix=args.img_paths)['Contents']
         keys = []
-        for key in objs['Contents']:
+        for key in objs:
             if key['Size']>0:
                 keys.append(key['Key'])
         folders = []
         for key in keys:
             folders.append(key.split('/')[-2])
         folder = list(np.unique(folders))[-1]
+        print('Loading images from this video: ',folder)
         for key in tqdm(keys):
             if key.split('/')[-2]==folder:
-                s3.download_file(args.bucket, key, f'/home/video/{key[-1]}')
+                s3.download_file(args.bucket, key, f"/home/video/{key.split('/')[-1]}")
 
     cfg.merge_from_file(config_file)
     cfg.MODEL.RETINANET.SCORE_THRESH_TEST = args.conf_thresh
@@ -142,7 +144,7 @@ def main():
     # 'finetuned-detectron2-maskrcnn_fixed/model_final.pth'
     # finetuned-detectron2-maskrcnn_5700imgs_025lr_furthertuned/model_final.pth
     
-    if use_mask==0:
+    if args.use_mask==0:
         obj_detect = MRCNN_FPN(model,num_classes=1)
     else:
         obj_detect = FRCNN_FPN(model, num_classes=1)
@@ -151,7 +153,7 @@ def main():
 
     # reid
     reid_network = resnet50(pretrained=False, output_dim=128)  # need to insert dictionary here 
-    reid_network.load_state_dict(torch.load( args.reid_model, #tracktor['reid_weights'],'/home/ubuntu/code/tracking_wo_bnw/output/tracktor/reid/test/ResNet_iter_25137.pth'
+    reid_network.load_state_dict(torch.load( reid_pth, #tracktor['reid_weights'],'/home/ubuntu/code/tracking_wo_bnw/output/tracktor/reid/test/ResNet_iter_25137.pth'
                                             map_location=device)) #lambda storage, loc: storage))
     reid_network.eval()
     #reid_network.cuda()
@@ -200,15 +202,14 @@ def main():
     # tracker = Tracker(obj_detect, reid_network, tracker)
     tracker.do_align=False
 
-    def transform_img(i, vid_name ='57587_002968_Sideline' ,pth = '/home/ubuntu/videos/'):
-    #     if(i<10):
-    #         ind = f'000{i}'
-    #     elif(i<100):
-    #         ind = f'00{i}'
-    #     else:
-    #         ind = f'0{i}'
-        ind = i
-        frame = Image.open(f'{pth}{vid_name}/{vid_name}_frame{ind}.jpg')
+    def transform_img(i ,pth = '/home/ubuntu/videos/'):
+        if(i<10):
+            ind = f'0000{i}'
+        elif(i<100):
+            ind = f'000{i}'
+        else:
+            ind = f'00{i}'
+        frame = Image.open(f'{pth}split_frames_{ind}.jpg')
         frame_ten = torch.tensor(np.reshape(np.array(frame),(1,3,720,1280)), device=device, dtype=torch.float32)
         blob = {'img':frame_ten}
         return blob
@@ -216,7 +217,7 @@ def main():
 
     # need to make this an argparse argument 
     pth = '/home/video/'
-    vid_name = args.video #'57675_003286_Endzone'
+#     vid_name = args.video #'57675_003286_Endzone'
     img_paths = glob(f'{pth}/*') # {vid_name}
     # img_paths.sort()
 
@@ -226,7 +227,7 @@ def main():
     print('Starting tracking!')
     for i in tqdm(range(1,len(img_paths)+1)):
         #tracker.reset()
-        blob = transform_img(i, vid_name = vid_name ,pth=pth)
+        blob = transform_img(i ,pth=pth)
         with torch.no_grad():
             tracker.step(blob)
 
@@ -242,9 +243,11 @@ def main():
     with open(file,'w') as f:
         json.dump(tracking_dict,f)
     now = str(datetime.datetime.now()).replace(' ','').replace(':','-')
-    s3.upload_file(Filename=file, Bucket=args.bucket, Key=f'nfl-data/tracking_results_{now}.json')
+    k = f'nfl-data/tracking_results_{now}.json'
+    s3.upload_file(Filename=file, Bucket=args.bucket, Key=k)
+    print(f'Tracking finished and results saved to: s3://{args.bucket}/{k}')
     
     
 if __name__ == "__main__":
     main()
-    dllogger.flush()
+#     dllogger.flush()

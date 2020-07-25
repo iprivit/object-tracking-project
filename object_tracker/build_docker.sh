@@ -36,6 +36,7 @@ docker tag ${algorithm_name} ${fullname}
 # some kind of security auth issue with pushing this to ecr, not authorized to perform ecr:InitiateLayerUpload
 docker push ${fullname}
 
+rm -rf .aws
 
 
 
