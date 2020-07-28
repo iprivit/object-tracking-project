@@ -170,9 +170,9 @@ def main():
         'regression_nms_thresh': 0.6,
         # motion model settings
         'motion_model':{
-          'enabled': False,
+          'enabled': True,
           # average velocity over last n_steps steps
-          'n_steps': 1,
+          'n_steps': 2,
           # if true, only model the movement of the bounding box center. If false, width and height are also modeled.
           'center_only': True},
         # DPM or DPM_RAW or 0, raw includes the unfiltered (no nms) versions of the provided detections,
@@ -193,7 +193,7 @@ def main():
         # How much timesteps dead tracks are kept and cosidered for reid
         'inactive_patience': 15,
         # How similar do image and old track need to be to be considered the same person
-        'reid_sim_threshold': 2.0,
+        'reid_sim_threshold': 10.0,
         # How much IoU do track and image need to be considered for matching
         'reid_iou_threshold': 0.2
       }

@@ -4,6 +4,7 @@ from PIL import Image
 import numpy as np
 import argparse
 from glob import glob 
+from tqdm import tqdm
 import json
 
 def main():
@@ -38,7 +39,7 @@ def main():
         label_list = {}
         for r in result:
             try:
-                res = result[r][j]
+                res = result[str(r)][str(j)]
                 label_list[r] = res
             except:
                 pass
@@ -47,8 +48,15 @@ def main():
             rect = patches.Rectangle((labs[0], labs[1]),labs[2]-labs[0],labs[3]-labs[1] ,linewidth=1,edgecolor='r',facecolor='none') # 50,100),40,30
             ax.add_patch(rect)
             plt.text(labs[0]-10, labs[1]-10, f'H:{r}', fontdict=None)
-
-        plt.savefig(f'{args.output_dir}/frame_{j}.png')
+            
+        if(j<10):
+            ind = f'0000{j}'
+        elif(j<100):
+            ind = f'000{j}'
+        else:
+            ind = f'00{j}'
+            
+        plt.savefig(f'{args.output_dir}/frame_{ind}.png')
         
         
 if __name__ == "__main__":
