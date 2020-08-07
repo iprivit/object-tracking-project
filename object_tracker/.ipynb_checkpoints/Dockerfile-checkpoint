@@ -1,7 +1,7 @@
 FROM nvidia/cuda:10.1-cudnn7-devel
 
 RUN apt-get update && apt-get install -y \
-	ca-certificates python3-dev git wget nginx sudo  \
+	ca-certificates python3-dev git wget ffmpeg nginx sudo  \
 	cmake ninja-build protobuf-compiler libprotobuf-dev && \
   rm -rf /var/lib/apt/lists/*
   

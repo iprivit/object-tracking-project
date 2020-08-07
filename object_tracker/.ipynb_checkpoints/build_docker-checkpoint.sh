@@ -3,7 +3,7 @@
 cp -r ~/.aws .
 
 
-algorithm_name=object-tracker
+algorithm_name=object-tracker2
 
 chmod +x serve
 

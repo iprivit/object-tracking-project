@@ -181,7 +181,7 @@ def main():
         # How much last appearance features are to keep
         'max_features_num': 20,
         # Do camera motion compensation
-        'do_align': True,
+        'do_align': False,
         # Which warp mode to use (cv2.MOTION_EUCLIDEAN, cv2.MOTION_AFFINE, ...)
         'warp_mode': str(cv2.MOTION_EUCLIDEAN),
         # maximal number of iterations (original 50)
@@ -193,14 +193,13 @@ def main():
         # How much timesteps dead tracks are kept and cosidered for reid
         'inactive_patience': 15,
         # How similar do image and old track need to be to be considered the same person
-        'reid_sim_threshold': 10.0,
+        'reid_sim_threshold': 20.0,
         # How much IoU do track and image need to be considered for matching
-        'reid_iou_threshold': 0.2
+        'reid_iou_threshold': 0.05
       }
 
     tracker = IJP_tracker(obj_detect, reid_network, tracker)
     # tracker = Tracker(obj_detect, reid_network, tracker)
-    tracker.do_align=False
 
     def transform_img(i ,pth = '/home/ubuntu/videos/'):
         if(i<10):
