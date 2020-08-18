@@ -3,6 +3,7 @@ from torch import nn
 from torch import optim
 import torchvision
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 from detectron2.engine.defaults import DefaultPredictor, DefaultTrainer
 from detectron2.utils.video_visualizer import VideoVisualizer
@@ -42,18 +43,23 @@ from collections import OrderedDict
 from collections import deque
 from matplotlib import patches
 
-from torch.autograd import Variable
 from scipy.optimize import linear_sum_assignment
 import argparse
 import subprocess
 import datetime
+from matplotlib import pyplot as plt
+from matplotlib import patches
+import warnings
 
-#from .utils import bbox_overlaps, warp_pos, get_center, get_height, get_width, make_pos
+warnings.filterwarnings(action='ignore')
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sns = boto3.client('sns')
 s3 = boto3.client('s3')
+a2i = boto3.client('sagemaker-a2i-runtime')
+sagemaker_client = boto3.client('sagemaker')
+
 
 config_file = '/home/ubuntu/code/detectron2-ResNeSt/configs/quick_schedules/mask_rcnn_R_50_FPN_inference_acc_test.yaml'
 # config_file = '/home/ubuntu/code/detectron2-ResNeSt/configs/COCO-Detection/helmet_faster_cascade_rcnn_ResNeSt_101_FPN_syncbn_range-scale_1x.yaml'
@@ -68,6 +74,36 @@ device="cuda:0"
 
 # obj_detect.eval()
 #obj_detect.cuda()
+
+def bbox_iou(box1, box2, x1y1x2y2=True):
+    if x1y1x2y2:
+        x1_min = min(box1[0], box2[0])
+        x2_max = max(box1[2], box2[2])
+        y1_min = min(box1[1], box2[1])
+        y2_max = max(box1[3], box2[3])
+        w1, h1 = box1[2] - box1[0], box1[3] - box1[1]
+        w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
+    else:
+        w1, h1 = box1[2], box1[3]
+        w2, h2 = box2[2], box2[3]
+        x1_min = min(box1[0] - w1 / 2.0, box2[0] - w2 / 2.0)
+        x2_max = max(box1[0] + w1 / 2.0, box2[0] + w2 / 2.0)
+        y1_min = min(box1[1] - h1 / 2.0, box2[1] - h2 / 2.0)
+        y2_max = max(box1[1] + h1 / 2.0, box2[1] + h2 / 2.0)
+
+    w_union = x2_max - x1_min
+    h_union = y2_max - y1_min
+    w_cross = w1 + w2 - w_union
+    h_cross = h1 + h2 - h_union
+    carea = 0
+    if w_cross <= 0 or h_cross <= 0:
+        return 0.0
+
+    area1 = w1 * h1
+    area2 = w2 * h2
+    carea = w_cross * h_cross
+    uarea = area1 + area2 - carea
+    return float(carea / uarea)
 
 
 
@@ -107,10 +143,12 @@ def main():
         pass
     
     if os.path.exists(args.model)==False:
+        print('\n')
         print('downloading d2 model from s3')
         s3.download_file(args.bucket, args.model, '/home/d2_final.pth')
         model_pth = '/home/d2_final.pth'
     if os.path.exists(args.reid_model)==False:
+        print('\n')
         print('downloading reid model from s3')
         s3.download_file(args.bucket, args.reid_model, '/home/reid_final.pth')
         reid_pth = '/home/reid_final.pth'    
@@ -124,6 +162,7 @@ def main():
         for key in keys:
             folders.append(key.split('/')[-2])
         folder = list(np.unique(folders))[-1]
+        print('\n')
         print('Loading images from this video: ',folder)
         for key in tqdm(keys):
             if key.split('/')[-2]==folder:
@@ -218,17 +257,129 @@ def main():
     pth = '/home/video/'
 #     vid_name = args.video #'57675_003286_Endzone'
     img_paths = glob(f'{pth}/*') # {vid_name}
-    # img_paths.sort()
+    img_paths.sort()
+#     print(img_paths)
 
     tracker.reset()
 
-    results = []
-    print('Starting tracking!')
+#     results = []
+#     print('Starting tracking!')
+#     for i in tqdm(range(1,len(img_paths)+1)):
+#         #tracker.reset()
+#         blob = transform_img(i ,pth=pth)
+#         with torch.no_grad():
+#             tracker.step(blob)
+            
+    track_dict = {}
+
+    print("\n")
+    print("###########################################")
+    print("############## BEGIN TRACKING #############")
+    print("###########################################")
+    print('\n')
+
     for i in tqdm(range(1,len(img_paths)+1)):
-        #tracker.reset()
-        blob = transform_img(i ,pth=pth)
+        track_dict[i] = {}
+        blob = transform_img(i,pth=pth)
         with torch.no_grad():
             tracker.step(blob)
+        for tr in tracker.tracks:
+            track_dict[i][tr.id] = tr.pos[0].detach().cpu().numpy()
+            
+    iou_dict = {}
+    iou_dict2 = {}
+    new_tracks = {}
+    missing_tracks = {}
+
+    for track in tqdm(track_dict):
+        if track==1: # set dictionaries with 1st frame
+            new_tracks[track] = list(track_dict[track].keys())
+            missing_tracks[track] = set()
+            iou_dict[track] = {}
+            iou_dict[track] = {}
+            for tr in track_dict[track]:
+                iou_dict[track][tr] = {}
+        else:
+            new_tracks[track] = set(list(track_dict[track].keys()))  - set(new_tracks[1]) # - set(list(track_dict[track-1].keys()))
+            missing_tracks[track] = set(new_tracks[1]) - set(list(track_dict[track-1].keys()))
+            iou_dict[track] = {}
+            iou_dict2[track] = {}
+            for tr in track_dict[track]:
+                iou_dict[track][tr] = {}
+                iou_dict2[track][tr] = {}
+                for t in track_dict[track-1]:
+                    iou = bbox_iou(track_dict[track][tr], track_dict[track-1][t])
+                    if iou>0.001:
+                        iou_dict[track][tr][t] = iou
+                if track>2:
+                    for t in track_dict[track-2]:
+                        iou = bbox_iou(track_dict[track][tr], track_dict[track-2][t])
+                        if iou>0.001:
+                            iou_dict2[track][tr][t] = iou   
+                            
+    tracks_to_delete = {}
+    tracks_to_change = {}                        
+    momentum_dict = {}
+    for track in track_dict:
+        if track==1:
+            for tr in track_dict[track]:
+                momentum_dict[tr] = 0 # initialize momentum dict 
+        elif len(track_dict[track])>22:  # if there are more than 22 annotations
+            tracks_to_delete[track] = []
+            for tr in track_dict[track]:
+                try:
+                    momentum_dict[tr] +=1
+                except:
+                    momentum_dict[tr] = 0
+            for ind in iou_dict[track]:
+                if (iou_dict[track][ind]=={})&(ind>22):  # need to adjust this, right now just looking if there is ANY IoU
+                    tracks_to_delete[track].append(ind)
+        else: # if less than 22 annotations
+            tracks_to_change[track] = {}
+            if new_tracks[track]!=set():  # if there are new tracks, check them
+                for tr in track_dict[track]: # update momentum dict
+                    try:
+                        momentum_dict[tr] +=1
+                    except:
+                        momentum_dict[tr] = 0
+                for newt in new_tracks[track]: # cycle through new tracks 
+    #                 print('For track ',track,"and ID ",newt,iou_dict[track][newt])
+                    if newt>22:  # if there is a new track and it's greater than 22, change it, figure out what to change to
+                        if (missing_tracks[track]!=set())|(missing_tracks[track-1]!=set()): # if there are missing tracks, cycle through them and compare
+                            mis_iou = {}    
+                            if missing_tracks[track]!=set():
+                                for mis in missing_tracks[track]:
+                                    try:
+    #                                     iou = bbox_iou(track_dict[track-1][mis], track_dict[track][newt]) 
+                                        dist = distance.euclidean(track_dict[track-1][mis], track_dict[track][newt])
+                                    except:
+                                        try:
+    #                                         iou = bbox_iou(track_dict[track-2][mis], track_dict[track][newt]) 
+                                            dist = distance.euclidean(track_dict[track-2][mis], track_dict[track][newt])
+                                        except:
+                                            try:
+    #                                             iou = bbox_iou(track_dict[track-3][mis], track_dict[track][newt]) 
+                                                dist = distance.euclidean(track_dict[track-3][mis], track_dict[track][newt])
+                                            except:
+                                                pass 
+
+                                    mis_iou[mis] = dist
+    #                                 tracks_to_change[track][newt] = 
+                                    tracks_to_change[track][newt] = mis_iou
+    #                         if missing_tracks[track-1]!=set():
+    #                             for mis in missing_tracks[track-1]:
+    #                                 iou = bbox_iou(track_dict[track-2][mis], track_dict[track][newt]) 
+    #                                 mis_iou[mis] = iou
+    #                                 tracks_to_change[track][newt] = mis_iou
+
+    #                         try:
+    #                             if max(tracks_to_change[track][newt].values())>.2:
+                    #                 for t in tracks_to_change[trc][tr]:
+                                to_ind = np.argmin(list(tracks_to_change[track][newt].values()))
+                                to_id = list(tracks_to_change[track][newt].keys())[to_ind]
+                                to_pos = track_dict[track][newt]
+                                del track_dict[track][newt]
+                                track_dict[track][to_id] = to_pos  
 
     # need to send results to s3 
     result = tracker.get_results()
@@ -245,6 +396,88 @@ def main():
     k = f'nfl-data/tracking_results_{folder}.json'
     s3.upload_file(Filename=file, Bucket=args.bucket, Key=k)
     print(f'Tracking finished and results saved to: s3://{args.bucket}/{k}')
+    
+    os.makedirs('/home/labeled_frames')
+    # create labeled images
+    print('\n')
+    print("###########################################")
+    print("############ Generating Video! ############")
+    print("###########################################")
+    print('\n')
+    print('...')
+    for j,pth in tqdm(enumerate(img_paths)):
+        fig,ax = plt.subplots(1, figsize=(24,14))
+
+        img = Image.open(pth)
+        # Display the image
+        ax.imshow(np.array(img))
+
+        # Create a Rectangle patch
+        label_list = {}
+        for r in track_dict[j+1]:
+            try:
+                res = track_dict[j+1][r]
+                label_list[r] = res
+            except:
+                pass
+        for i,r in enumerate(label_list):
+            labs = label_list[r]
+            rect = patches.Rectangle((labs[0], labs[1]),labs[2]-labs[0],labs[3]-labs[1] ,linewidth=1,edgecolor='r',facecolor='none') # 50,100),40,30
+            ax.add_patch(rect)
+            plt.text(labs[0]-10, labs[1]-10, f'H:{r}', fontdict=None)
+
+        plt.savefig(f"/home/labeled_frames/{pth.split('/')[-1].replace('.jpg','.png')}")
+        plt.close()
+    # create video of labels 
+    os.system('ffmpeg -r 15 -f image2 -s 1280x720 -i /home/labeled_frames/split_frames_%05d.png -vcodec libx264 -crf 25  -pix_fmt yuv420p /home/labeled_frames.mp4')
+    k = f'nfl-data/tracking_results_{folder}.mp4'
+    s3.upload_file(Filename='/home/labeled_frames.mp4', Bucket=args.bucket, Key=k)
+    print('\n')
+    print(f'Video uploaded to: s3://{args.bucket}/{k}')
+
+    # for launching A2I job set a conditional here 
+    s3_fname = f's3://{args.bucket}/{k}'
+    workteam = 'arn:aws:sagemaker:us-east-1:209419068016:workteam/private-crowd/ijp-private-workteam'
+    flowDefinitionName = 'ijp-video-flow-official'
+    humanTaskUiArn = 'arn:aws:sagemaker:us-east-1:209419068016:human-task-ui/ijp-video-task3'
+
+    #'s3://privisaa-bucket-virginia/nfl-data/nfl-frames/nfl-video-frame00001.png'
+#     create_workflow_definition_response = sagemaker_client.create_flow_definition(
+#             FlowDefinitionName= flowDefinitionName,
+#             RoleArn= role,
+#             HumanLoopConfig= {
+#                 "WorkteamArn": workteam,
+#                 "HumanTaskUiArn": humanTaskUiArn,
+#                 "TaskCount": 1,
+#                 "TaskDescription": "Identify if the labels in the video look correct.",
+#                 "TaskTitle": "Video classification a2i demo"
+#             },
+#             OutputConfig={
+#                 "S3OutputPath" : OUTPUT_PATH
+#             }
+#         )
+#     flowDefinitionArn = create_workflow_definition_response['FlowDefinitionArn']
+    
+    inputContent = {
+                "initialValue": .2,
+                "taskObject": s3_fname # the s3 object will be passed to the worker task UI to render
+            }
+    
+    now= str(datetime.datetime.now()).replace(' ','-').replace(':','-').replace('.','-')
+    response = a2i.start_human_loop(
+        HumanLoopName=f'ijp-video-{now}',
+        FlowDefinitionArn=flowDefinitionArn,
+        HumanLoopInput={
+            "InputContent": json.dumps(inputContent)
+        },
+        DataAttributes={
+            'ContentClassifiers': ['FreeOfPersonallyIdentifiableInformation'
+            ]
+        }
+    )
+    print(f'Launched A2I loop ijp-video-{now}')
+    
+    sns.publish(TopicArn='arn:aws:sns:us-east-1:209419068016:ijp-topic',Message=f'Your video inference is done! You can find the output here: s3://{args.bucket}/{k}',Subject='Video labeling')
     
     
 if __name__ == "__main__":

@@ -41,15 +41,16 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 
-def _get_predictor(config_path, model_path):
+def _get_predictor(config_path, model_path=None):
     
     cfg = get_cfg()
     
     cfg.merge_from_file(config_path) # get baseline parameters from YAML config
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
-    cfg.MODEL.WEIGHTS = model_path
+    if model_path:
+        cfg.MODEL.WEIGHTS = model_path
     cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 256
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
+#     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
 
     pred = DefaultPredictor(cfg)
     logger.info('Made it to loading predictor')
