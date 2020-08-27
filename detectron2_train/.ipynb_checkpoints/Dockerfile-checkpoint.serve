@@ -3,7 +3,7 @@ FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference:1.5.1-gpu-py
 
 # This is to fix issue: https://github.com/pytorch/vision/issues/1489
 RUN pip install --upgrade --force-reinstall torch torchvision cython
-RUN pip install sagemaker sagemaker_inference boto3 # needed for debug purposes only
+RUN pip install sagemaker==1.72.0 sagemaker_inference boto3 # needed for debug purposes only
 
 ############# D2 section ##############
 

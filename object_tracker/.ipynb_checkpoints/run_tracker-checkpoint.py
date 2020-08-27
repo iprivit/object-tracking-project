@@ -442,21 +442,21 @@ def main():
     humanTaskUiArn = 'arn:aws:sagemaker:us-east-1:209419068016:human-task-ui/ijp-video-task3'
 
     #'s3://privisaa-bucket-virginia/nfl-data/nfl-frames/nfl-video-frame00001.png'
-    create_workflow_definition_response = sagemaker_client.create_flow_definition(
-            FlowDefinitionName= flowDefinitionName,
-            RoleArn= role,
-            HumanLoopConfig= {
-                "WorkteamArn": workteam,
-                "HumanTaskUiArn": humanTaskUiArn,
-                "TaskCount": 1,
-                "TaskDescription": "Identify if the labels in the video look correct.",
-                "TaskTitle": "Video classification a2i demo"
-            },
-            OutputConfig={
-                "S3OutputPath" : OUTPUT_PATH
-            }
-        )
-    flowDefinitionArn = create_workflow_definition_response['FlowDefinitionArn']
+#     create_workflow_definition_response = sagemaker_client.create_flow_definition(
+#             FlowDefinitionName= flowDefinitionName,
+#             RoleArn= role,
+#             HumanLoopConfig= {
+#                 "WorkteamArn": workteam,
+#                 "HumanTaskUiArn": humanTaskUiArn,
+#                 "TaskCount": 1,
+#                 "TaskDescription": "Identify if the labels in the video look correct.",
+#                 "TaskTitle": "Video classification a2i demo"
+#             },
+#             OutputConfig={
+#                 "S3OutputPath" : OUTPUT_PATH
+#             }
+#         )
+#     flowDefinitionArn = create_workflow_definition_response['FlowDefinitionArn']
     
     inputContent = {
                 "initialValue": .2,

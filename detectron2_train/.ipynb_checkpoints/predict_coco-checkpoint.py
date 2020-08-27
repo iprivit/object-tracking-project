@@ -8,7 +8,8 @@ import argparse
 import logging
 import sys
 import boto3
-import pickle    
+import pickle  
+import subprocess
 from yacs.config import CfgNode as CN
 import numpy as np
 from PIL import Image
@@ -54,7 +55,8 @@ def _get_predictor(config_path, model_path=None):
 
     pred = DefaultPredictor(cfg)
     logger.info('Made it to loading predictor')
-    pred.model.load_state_dict(torch.load(model_path)['model'])
+    if model_path:
+        pred.model.load_state_dict(torch.load(model_path)['model'])
     logger.info('Made it to loading weights')
     #logger.info(cfg)
     eval_results = pred.model.eval() 
@@ -70,9 +72,15 @@ def model_fn(model_dir):
     """
     
     logger.info("Deserializing Detectron2 model...")
-    os.system('ls /opt/ml/')
+#     os.system('ls /opt/ml/')
     os.system('echo check model path')
     os.system('ls /opt/ml/model')
+    os.system('echo check model/home path')
+    os.system('ls /opt/ml/model/home')
+    os.system('echo check model/code path')
+    os.system('ls /opt/ml/model/code')
+
+
 
     try:
         # Restoring trained model, take a first .yaml and .pth/.pkl file in the model directory
@@ -84,20 +92,20 @@ def model_fn(model_dir):
             if file.endswith(".pth") or file.endswith(".pkl"):
                 model_path = os.path.join(model_dir, file)
                 
-        config_path = '/opt/ml/mask_rcnn_R_50_FPN_inference_acc_test.yaml'
-        model_path = '/opt/ml/model_final_13000.pth'
+        config_path = '/opt/ml/retinanet_R_50_FPN_inference_acc_test.yaml'
+        model_path = '/opt/ml/model/code/model_final_5bd44e.pkl'
         logger.info(f"Using config file {config_path}")
-        logger.info(f"Using model weights from {model_path}")            
+        logger.info(f"Using model weights from {model_path}")    
 
         pred = _get_predictor(config_path,model_path)
     except:
         try:
-            config_path = '/opt/ml/mask_rcnn_R_50_FPN_inference_acc_test.yaml'
-            model_path = '/opt/ml/model_final_5700.pth'
+            config_path = '/opt/ml/retinanet_R_50_FPN_inference_acc_test.yaml'
+#             model_path = '/opt/ml/model_final_5700.pth'
             logger.info(f"Using config file {config_path}")
-            logger.info(f"Using backup model weights from {model_path}")            
+#             logger.info(f"Using backup model weights from {model_path}")    
 
-            pred = _get_predictor(config_path,model_path)
+            pred = _get_predictor(config_path,model_path=None)
         except Exception as e:
             logger.error("Model deserialization failed...")
             logger.error(e)  
@@ -116,7 +124,7 @@ def input_fn(request_body, request_content_type):
     try:
         if "application/x-npy" in request_content_type:
             nparr = np.frombuffer(request_body, np.uint8)
-            #img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             input_object = np.asarray(img)
 #             input_object = decoder.decode(request_body, CONTENT_TYPE_NPY)
         elif "jpeg" in request_content_type:
