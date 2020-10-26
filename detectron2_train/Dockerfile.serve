@@ -22,11 +22,15 @@ COPY detectron2 /opt/ml/detectron2
 
 WORKDIR /opt/ml
 #COPY model_final.pth /opt/ml/model/model_final.pth
-COPY model_final_5700.pth /opt/ml/model_final_5700.pth
-COPY model_final_13000.pth /opt/ml/model_final_13000.pth
+# COPY model_final_5700.pth /opt/ml/model_final_5700.pth
+# COPY model_final_13000.pth /opt/ml/model_final_13000.pth
 COPY detectron2/configs/quick_schedules/mask_rcnn_R_50_FPN_inference_acc_test.yaml /opt/ml/mask_rcnn_R_50_FPN_inference_acc_test.yaml
+COPY detectron2/configs/quick_schedules/retinanet_R_50_FPN_inference_acc_test.yaml /opt/ml/retinanet_R_50_FPN_inference_acc_test.yaml
 COPY detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml /opt/ml/mask_rcnn_R_50_FPN_3x.yaml
+COPY detectron2/configs/COCO-Detection/retinanet_R_50_FPN_3x.yaml /opt/ml/retinanet_R_50_FPN_3x.yaml
 COPY detectron2/configs/Base-RCNN-FPN.yaml /opt/ml/Base-RCNN-FPN.yaml
+COPY detectron2/configs/Base-RetinaNet.yaml /opt/ml/Base-RetinaNet.yaml
+
 
 # Set a fixed model cache directory. Detectron2 requirement
 ENV FVCORE_CACHE="/tmp"
