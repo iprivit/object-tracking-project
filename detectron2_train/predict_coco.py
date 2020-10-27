@@ -50,7 +50,7 @@ def _get_predictor(config_path, model_path=None):
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
     if model_path:
         cfg.MODEL.WEIGHTS = model_path
-    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 256
+    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 128
 #     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1
 
     pred = DefaultPredictor(cfg)
@@ -92,7 +92,8 @@ def model_fn(model_dir):
             if file.endswith(".pth") or file.endswith(".pkl"):
                 model_path = os.path.join(model_dir, file)
                 
-        config_path = '/opt/ml/retinanet_R_50_FPN_inference_acc_test.yaml'
+        config_path = '/opt/ml/detectron2/configs/quick_schedules/retinanet_R_50_FPN_inference_acc_test.yaml'
+        # let's instead glob the model path rather than hardcode it 
         model_path = '/opt/ml/model/code/model_final_5bd44e.pkl'
         logger.info(f"Using config file {config_path}")
         logger.info(f"Using model weights from {model_path}")    
@@ -100,8 +101,10 @@ def model_fn(model_dir):
         pred = _get_predictor(config_path,model_path)
     except:
         try:
-            config_path = '/opt/ml/retinanet_R_50_FPN_inference_acc_test.yaml'
+            config_path = '/opt/ml/detectron2/configs/quick_schedules/retinanet_R_50_FPN_inference_acc_test.yaml'
+            #'/opt/ml/retinanet_R_50_FPN_inference_acc_test.yaml'
 #             model_path = '/opt/ml/model_final_5700.pth'
+            model_path = '/opt/ml/model/model_final_5bd44e.pkl'
             logger.info(f"Using config file {config_path}")
 #             logger.info(f"Using backup model weights from {model_path}")    
 
@@ -124,7 +127,12 @@ def input_fn(request_body, request_content_type):
     try:
         if "application/x-npy" in request_content_type:
             nparr = np.frombuffer(request_body, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+#             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            try:
+                dim = int((len(nparr)/3)**.5)
+                img = np.reshape(nparr, (dim,dim,3))
+            except:
+                img = np.reshape(nparr, (512,512,3))
             input_object = np.asarray(img)
 #             input_object = decoder.decode(request_body, CONTENT_TYPE_NPY)
         elif "jpeg" in request_content_type:

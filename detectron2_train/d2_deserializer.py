@@ -26,8 +26,8 @@ def json_to_d2(predictions, device):
             # Convert masks from pycoco RLE format to Detectron2 format
             pred_masks = np.stack([mask_util.decode(rle) for rle in v])
     
-    pred_dict["pred_masks"] = torch.Tensor(pred_masks).to(device).to(torch.bool)
-    del pred_dict["pred_masks_rle"]
+            pred_dict["pred_masks"] = torch.Tensor(pred_masks).to(device).to(torch.bool)
+            del pred_dict["pred_masks_rle"]
     
     height, width = pred_dict['image_size']
     del pred_dict['image_size']
@@ -55,7 +55,7 @@ def d2_to_json(predictions):
         if k=="pred_masks":            
             output["pred_masks_rle"] = convert_masks_to_rle(v)
     
-    instances.remove('pred_masks')
+            instances.remove('pred_masks')
             
     # Store image size
     output['image_size'] = instances.image_size

@@ -315,6 +315,7 @@ def setup(args):
     cfg = get_cfg()
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
+    cfg.OUTPUT_DIR= os.environ['SM_OUTPUT_DATA_DIR']
     cfg.freeze()
     default_setup(
         cfg, args
