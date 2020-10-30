@@ -309,9 +309,9 @@ def setup(args):
     """
     Create configs and perform basic setups.
     """
-    if (sm_args.spot_ckpt!='')&(sm_args.spot_ckpt is not None):
-        os.system(f"aws s3 cp {sm_args.spot_ckpt} /opt/ml/checkpoints/{sm_args.spot_ckpt.split('/')[-1]}")
-        cfg.MODEL.WEIGHTS = f"/opt/ml/checkpoints/{sm_args.spot_ckpt.split('/')[-1]}"
+    if (args.spot_ckpt!='')&(args.spot_ckpt is not None):
+        os.system(f"aws s3 cp {args.spot_ckpt} /opt/ml/checkpoints/{args.spot_ckpt.split('/')[-1]}")
+        cfg.MODEL.WEIGHTS = f"/opt/ml/checkpoints/{args.spot_ckpt.split('/')[-1]}"
     cfg = get_cfg()
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
@@ -381,10 +381,14 @@ if __name__ == "__main__":
     os.system('echo ----------------')
     os.system('ls /')
     os.system('echo ----------------')
-    os.system('ls /home')
+    os.system('ls /opt/ml/code/source')
     os.system('echo ----------------')
 
     os.system('cp /opt/ml/code/ped_mask_rcnn_R_50_FPN_training_acc_test.yaml /opt/ml/code/detectron2/configs/quick_schedules/ped_mask_rcnn_R_50_FPN_training_acc_test.yaml')
+    
+    moddir = os.environ['SM_MODULE_DIR']
+    os.system(f'aws s3 cp {moddir} /opt/ml/code')
+    
     
     
     print("Command Line Args:", args)

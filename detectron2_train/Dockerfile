@@ -31,8 +31,8 @@ ENV DETECTRON2_DATASETS="/opt/ml/input/data/train"
 
 ############# SageMaker section ##############
 
-COPY plain_train_net.py /opt/ml/code/plain_train_net.py
-COPY ped_mask_rcnn_R_50_FPN_training_acc_test.yaml /opt/ml/code/ped_mask_rcnn_R_50_FPN_training_acc_test.yaml
+COPY container_training/plain_train_net.py /opt/ml/code/plain_train_net.py
+# COPY container_training/ped_mask_rcnn_R_50_FPN_training_acc_test.yaml /opt/ml/code/ped_mask_rcnn_R_50_FPN_training_acc_test.yaml
 WORKDIR /opt/ml/code
 
 # cloning D2 to code dir as we need access to default congigs
@@ -40,8 +40,8 @@ RUN git clone 'https://github.com/facebookresearch/detectron2.git'
 RUN cd detectron2 && git checkout be792b9 
 RUN python -m pip install -e detectron2
 
-ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code/source
-ENV SAGEMAKER_PROGRAM plain_train_net.py
+ENV SAGEMAKER_SUBMIT_DIRECTORY /opt/ml/code
+# ENV SAGEMAKER_PROGRAM plain_train_net.py
 
 WORKDIR /
 
